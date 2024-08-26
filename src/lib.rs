@@ -117,13 +117,11 @@ impl Pool {
 
   pub fn execute<T: Send + 'static, E: Send + 'static>(&mut self, mut job: Job<T, E>) -> ExecutionResults<T, E> {
     let task_count = job.tasks.len();
-    let pb = Arc::new(
-      if self.quiet {
-        indicatif::ProgressBar::hidden()
-      } else {
-        indicatif::ProgressBar::new(task_count as u64)
-      }
-    );
+    let pb = Arc::new(if self.quiet {
+      indicatif::ProgressBar::hidden()
+    } else {
+      indicatif::ProgressBar::new(task_count as u64)
+    });
     pb.set_style(progress_bar_style(task_count));
     pb.set_prefix(job.name.clone());
     pb.enable_steady_tick(1000);
