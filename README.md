@@ -1,7 +1,7 @@
 progpool
 ========
 
-[![CircleCI](https://circleci.com/gh/jmgao/progpool.svg?style=svg)](https://circleci.com/gh/jmgao/progpool)
+[![ci.yml](https://github.com/jmgao/progpool/actions/workflows/ci.yml/badge.svg)](https://github.com/jmgao/progpool/actions/workflows/ci.yml)
 
 progpool is a simple thread pool library with a command-line progress bar.
 
