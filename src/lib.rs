@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto as _;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 fn progress_bar_style(task_count: usize) -> indicatif::ProgressStyle {
@@ -127,13 +127,14 @@ impl Pool {
     });
 
     tracing::span!(tracing::Level::INFO, "Pool::execute", name = job.name).in_scope(|| {
-      let mut successful = Vec::new();
-      let mut failed = Vec::new();
+      let mut successful = BTreeMap::new();
+      let mut failed = BTreeMap::new();
       {
-        let state = Mutex::new((&mut task_monitor, &mut successful, &mut failed));
+        let state = Arc::new(Mutex::new((&mut task_monitor, &mut successful, &mut failed)));
         self.thread_pool().scope(|scope| {
-          for task in job.tasks.drain(..) {
-            scope.spawn(|_| {
+          for (i, task) in job.tasks.drain(..).enumerate() {
+            let state = state.clone();
+            scope.spawn(move |_| {
               tracing::span!(tracing::Level::INFO, "Task::task", name = task.name).in_scope(|| {
                 let task_id = {
                   let mut guard = state.lock().unwrap();
@@ -148,16 +149,24 @@ impl Pool {
                 task_monitor.finished(task_id);
                 match result {
                   Ok(result) => {
-                    successful.push(ExecutionResult {
-                      name: task.name,
-                      result,
-                    });
+                    successful.insert(
+                      i,
+                      ExecutionResult {
+                        name: task.name,
+                        result,
+                      },
+                    );
                   }
 
-                  Err(err) => failed.push(ExecutionResult {
-                    name: task.name,
-                    result: err,
-                  }),
+                  Err(err) => {
+                    failed.insert(
+                      i,
+                      ExecutionResult {
+                        name: task.name,
+                        result: err,
+                      },
+                    );
+                  }
                 }
               })
             })
@@ -166,7 +175,10 @@ impl Pool {
       }
       task_monitor.progress_bar.finish();
 
-      ExecutionResults { successful, failed }
+      ExecutionResults {
+        successful: successful.into_values().collect(),
+        failed: failed.into_values().collect(),
+      }
     })
   }
 }
